@@ -9,15 +9,3 @@ variable "vpc_cidr_block" {
     description = "CIDR Block of the created VPC"
     nullable    = false
 }
-
-variable "vpc_public_subnets" {
-    type        = map
-    description = "CIDR Block of the created VPC's Public Subnets"
-    nullable    = false
-}
-
-variable "vpc_private_subnets" {
-    type        = map
-    description = "CIDR Block of the created VPC's Private Subnets"
-    nullable    = false
-}

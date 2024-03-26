@@ -14,32 +14,6 @@ variable "vpc_cidr_block" {
     default     = "10.0.0.0/16"
 }
 
-variable "vpc_public_subnets" {
-    type        = map
-    description = "CIDR Block of the created VPC's Public Subnets"
-    default     = {
-        "us-east-1a" = {
-            cidr = "10.0.0.0/18"
-        },
-        "us-east-1b" = {
-            cidr = "10.0.64.0/18"
-        }
-    }
-}
-
-variable "vpc_private_subnets" {
-    type        = map
-    description = "CIDR Block of the created VPC's Private Subnets"
-    default     = {
-        "us-east-1a" = {
-            cidr = "10.0.128.0/18"
-        },
-        "us-east-1b" = {
-            cidr = "10.0.192.0/18"
-        }
-    }
-}
-
 // ===============================
 // Cluster Variables
 // ===============================
@@ -56,30 +30,40 @@ variable "cluster_version" {
     default     = "1.29"
 }
 
-variable "enable_public_access" {
+variable "cluster_enable_public_access" {
     type        = bool
     description = "Should the cluster's endpoint be publically accessible"
     default     = true
 }
 
-variable "instance_types" {
-    type        = list(string)
-    description = "List of instance types available in the cluster"
-    default     = ["r6g.xlarge"]
-}
-
-variable "node_grous" {
-    type        = map(string)
+variable "cluster_node_groups" {
+    type        = map(object({
+        ami_type                     = string
+        capacity_type                = string
+        instance_types               = list(string)
+        volume_type                  = string
+        volume_size                  = number
+        volume_iops                  = optional(number)
+        volume_kms_key_id            = optional(string)
+        volume_encrypted             = optional(bool, false)
+        volume_delete_on_termination = optional(bool, true)
+        group_desired_size           = number
+        group_min                    = number
+        group_max                    = number
+        group_max_unavailable        = number
+    }))
     description = "A map of node group definitions to attach to the cluster"
-    default     = {}
-    // Sample Entry
-    //
-}
-
-variable "access_entries" {
-    type        = map(string)
-    description = "A map of access entries definig cluster access"
-    default     = {}
-    // Sample Entry
-    //
+    default     = {
+        "node-group" = {
+            ami_type                     = "AL2_ARM_64"
+            capacity_type                = "SPOT"
+            instance_types               = ["r6g.xlarge"]
+            volume_type                  = "gp2"
+            volume_size                  = 20
+            group_desired_size           = 3
+            group_min                    = 1
+            group_max                    = 5
+            group_max_unavailable        = 1
+        }
+    }
 }
