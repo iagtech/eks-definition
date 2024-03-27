@@ -55,7 +55,7 @@ variable "cluster_node_groups" {
     description = "A map of node group definitions to attach to the cluster"
     default     = {
         "node-group" = {
-            ami_type                     = "AL2_ARM_64"
+            ami_type                     = "AL2_x86_64"
             capacity_type                = "SPOT"
             instance_types               = ["r7i.xlarge"]
             volume_type                  = "gp2"

@@ -317,8 +317,17 @@ resource "null_resource" "cleanup" {
         when    = destroy
         command = <<EOT
 aws eks update-kubeconfig --name ${self.triggers.cluster_name} --role-arn ${self.triggers.admin_arn}
+
+eksctl delete iamserviceaccount --cluster=${self.triggers.cluster_name} --namespace=kube-system --name=aws-load-balancer-controller
+
 kubectl delete validatingwebhookconfiguration --all --all-namespaces
 kubectl delete mutatingwebhookconfiguration --all --all-namespaces
+
+kubectl delete ingress --all --all-namespaces
+while [ $(kubectl get ingress -A --no-headers | wc -l) -gt 0 ]; do echo 'waiting for ingress cleanup...'; sleep 5; done
+
+kubectl delete deployment --all --all-namespaces
+kubectl delete statefulset --all --all-namespaces
 kubectl delete pod --all --all-namespaces
 kubectl delete pvc --all --all-namespaces
 kubectl delete pv --all --all-namespaces
