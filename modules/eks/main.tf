@@ -66,7 +66,7 @@ resource "aws_iam_policy" "node_efs_policy" {
 }
 
 resource "aws_security_group" "eks" {
-    name        = "${var.cluster_name}-efs"
+    name        = "${var.cluster_name}-eks"
     description = "Allow traffic"
     vpc_id      = var.vpc
 
@@ -160,6 +160,8 @@ module "eks" {
     control_plane_subnet_ids = var.vpc_intra_subnets
 
     eks_managed_node_groups = local.flattened_groups
+
+    enable_cluster_creator_admin_permissions = true
 }
 
 resource "aws_efs_file_system" "kube" {

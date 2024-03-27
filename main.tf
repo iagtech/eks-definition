@@ -272,54 +272,54 @@ resource "aws_iam_policy" "node_elb_policy" {
     })
 }
 
+module "aws_auth" {
+    source  = "terraform-aws-modules/eks/aws//modules/aws-auth"
+    version = "~> 20.0"
+
+    manage_aws_auth_configmap = true
+
+    aws_auth_users = [for user in var.cluster_admin_users:
+        {
+            userarn  = user
+            username = split("/", user)[1]
+            groups   = ["system:masters"]
+        }
+    ]
+
+    depends_on = [ module.eks ]
+}
+
+locals {
+    our_rendered_content = templatefile("${path.module}/sc.tpl", { fs = module.eks.efs })
+}
+
+resource "null_resource" "local" {
+    triggers = {
+        template = local.our_rendered_content
+    }
+    
+    provisioner "local-exec" {
+        command = format(
+            "cat <<\"EOF\" > \"%s\"\n%s\nEOF",
+            "sc.yaml",
+            local.our_rendered_content
+        )
+    }
+
+    depends_on = [ module.eks ]
+}
+
 resource "null_resource" "eks_access" {
     provisioner "local-exec" {
         command = <<EOT
 aws eks update-kubeconfig --name ${var.cluster_name} --role-arn ${module.eks.admin_arn}
+kubectl apply -f sc.yaml
 eksctl create iamserviceaccount --cluster=${var.cluster_name} --namespace=kube-system --name=aws-load-balancer-controller --role-name ${var.cluster_name}-controller-role --attach-policy-arn=${aws_iam_policy.node_elb_policy.arn} --approve
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update eks
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller -n kube-system --set clusterName=${var.cluster_name} --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller
-echo <<EOF
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: efs-pv
-spec:
-  capacity:
-    storage: 10Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: efs-sc
-  csi:
-    driver: efs.csi.aws.com
-    volumeHandle: ${module.eks.efs}
----
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: efs-sc
-provisioner: efs.csi.aws.com
-volumeBindingMode: WaitForFirstConsumer
-parameters:
-  provisioningMode: efs-ap
-  fileSystemId: ${module.eks.efs}
-  directoryPerms: "777"
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: ebs-sc
-provisioner: ebs.csi.aws.com
-volumeBindingMode: WaitForFirstConsumer
-parameters:
-  type: gp3
-EOF | kubectl apply -f -
         EOT
     }
 
-    depends_on = [ module.eks ]
+    depends_on = [ module.aws_auth, null_resource.local ]
 }
