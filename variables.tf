@@ -5,7 +5,7 @@
 variable "vpc_name" {
     type        = string
     description = "Name of the VPC"
-    nullable    = false
+    default     = "iag-qa"
 }
 
 variable "vpc_cidr_block" {
@@ -21,7 +21,7 @@ variable "vpc_cidr_block" {
 variable "cluster_name" {
     type        = string
     description = "Name of the cluster"
-    nullable    = false
+    default     = "iag-qa"
 }
 
 variable "cluster_version" {

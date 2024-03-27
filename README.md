@@ -12,6 +12,9 @@ You will need to install
 - OpenTofu
 - AWS CLI
 - Kubectl
+- Helm
+- Eksctl
+- Curl
 
 in order to use these scripts
 

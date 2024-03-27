@@ -168,10 +168,10 @@ resource "aws_efs_file_system" "kube" {
 }
 
 resource "aws_efs_mount_target" "mount" {
-    for_each = toset(var.vpc_private_subnets)
+    count = length(var.vpc_private_subnets)
 
     file_system_id  = aws_efs_file_system.kube.id
-    subnet_id       = each.key
+    subnet_id       = var.vpc_private_subnets[count.index]
     security_groups = [aws_security_group.efs.id]
 }
 
