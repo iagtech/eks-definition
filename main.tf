@@ -323,9 +323,6 @@ eksctl delete iamserviceaccount --cluster=${self.triggers.cluster_name} --namesp
 kubectl delete validatingwebhookconfiguration --all --all-namespaces
 kubectl delete mutatingwebhookconfiguration --all --all-namespaces
 
-kubectl delete ingress --all --all-namespaces
-while [ $(kubectl get ingress -A --no-headers | wc -l) -gt 0 ]; do echo 'waiting for ingress cleanup...'; sleep 5; done
-
 kubectl delete deployment --all --all-namespaces
 kubectl delete statefulset --all --all-namespaces
 kubectl delete pod --all --all-namespaces
