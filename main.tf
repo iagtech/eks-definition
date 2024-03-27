@@ -272,23 +272,6 @@ resource "aws_iam_policy" "node_elb_policy" {
     })
 }
 
-module "aws_auth" {
-    source  = "terraform-aws-modules/eks/aws//modules/aws-auth"
-    version = "~> 20.0"
-
-    manage_aws_auth_configmap = true
-
-    aws_auth_users = [for user in var.cluster_admin_users:
-        {
-            userarn  = user
-            username = split("/", user)[1]
-            groups   = ["system:masters"]
-        }
-    ]
-
-    depends_on = [ module.eks ]
-}
-
 locals {
     our_rendered_content = templatefile("${path.module}/sc.tpl", { fs = module.eks.efs })
 }
@@ -309,17 +292,39 @@ resource "null_resource" "local" {
     depends_on = [ module.eks ]
 }
 
-resource "null_resource" "eks_access" {
+resource "null_resource" "eks_access_and_ingress" {
     provisioner "local-exec" {
-        command = <<EOT
+        command = <<EOE
 aws eks update-kubeconfig --name ${var.cluster_name} --role-arn ${module.eks.admin_arn}
 kubectl apply -f sc.yaml
 eksctl create iamserviceaccount --cluster=${var.cluster_name} --namespace=kube-system --name=aws-load-balancer-controller --role-name ${var.cluster_name}-controller-role --attach-policy-arn=${aws_iam_policy.node_elb_policy.arn} --approve
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update eks
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller -n kube-system --set clusterName=${var.cluster_name} --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller
+        EOE
+    }
+
+    depends_on = [ null_resource.local ]
+}
+
+resource "null_resource" "cleanup" {
+    triggers = {
+        cluster_name = var.cluster_name
+        admin_arn    = module.eks.admin_arn
+    }
+
+    provisioner "local-exec" {
+        when    = destroy
+        command = <<EOT
+aws eks update-kubeconfig --name ${self.triggers.cluster_name} --role-arn ${self.triggers.admin_arn}
+kubectl delete validatingwebhookconfiguration --all --all-namespaces
+kubectl delete mutatingwebhookconfiguration --all --all-namespaces
+kubectl delete pod --all --all-namespaces
+kubectl delete pvc --all --all-namespaces
+kubectl delete pv --all --all-namespaces
+while [ $(kubectl get pv -A --no-headers | wc -l) -gt 0 ]; do echo 'waiting for persistent volume cleanup...'; sleep 5; done
         EOT
     }
 
-    depends_on = [ module.aws_auth, null_resource.local ]
+    depends_on = [ null_resource.local ]
 }

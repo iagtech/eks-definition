@@ -216,10 +216,10 @@ resource "aws_iam_role_policy_attachment" "k8s_readonly" {
 }
 
 resource "aws_eks_access_entry" "k8s_admin" {
-    cluster_name  = module.eks.cluster_name
-    principal_arn = aws_iam_role.k8s_admin.arn
-    type          = "STANDARD"
-    depends_on    = [aws_iam_role.k8s_admin]
+    cluster_name      = module.eks.cluster_name
+    principal_arn     = aws_iam_role.k8s_admin.arn
+    type              = "STANDARD"
+    depends_on        = [aws_iam_role.k8s_admin]
 }
 
 resource "aws_eks_access_policy_association" "k8s_admin" {

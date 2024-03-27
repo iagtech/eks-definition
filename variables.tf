@@ -57,7 +57,7 @@ variable "cluster_node_groups" {
         "node-group" = {
             ami_type                     = "AL2_ARM_64"
             capacity_type                = "SPOT"
-            instance_types               = ["r6g.xlarge"]
+            instance_types               = ["r7i.xlarge"]
             volume_type                  = "gp2"
             volume_size                  = 20
             group_desired_size           = 1
