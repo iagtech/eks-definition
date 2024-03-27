@@ -40,12 +40,69 @@ data "aws_iam_policy_document" "clusteraccess" {
     }
 }
 
+resource "aws_iam_policy" "node_efs_policy" {
+    name        = "${var.cluster_name}-efs-policy"
+    path        = "/"
+    description = "Policy for EFKS nodes to use EFS"
+
+    policy = jsonencode({
+        "Statement": [
+            {
+                "Action": [
+                    "elasticfilesystem:DescribeMountTargets",
+                    "elasticfilesystem:DescribeFileSystems",
+                    "elasticfilesystem:DescribeAccessPoints",
+                    "elasticfilesystem:CreateAccessPoint",
+                    "elasticfilesystem:DeleteAccessPoint",
+                    "ec2:DescribeAvailabilityZones"
+                ],
+                "Effect": "Allow",
+                "Resource": "*",
+                "Sid": ""
+            }
+        ],
+        "Version": "2012-10-17"
+    })
+}
+
+resource "aws_security_group" "eks" {
+    name        = "${var.cluster_name}-efs"
+    description = "Allow traffic"
+    vpc_id      = var.vpc
+
+    egress {
+        from_port        = 0
+        to_port          = 0
+        protocol         = "-1"
+        cidr_blocks      = ["0.0.0.0/0"]
+        ipv6_cidr_blocks = ["::/0"]
+    }
+}
+
+resource "aws_security_group" "efs" {
+    name        = "${var.cluster_name}-efs"
+    description = "Allow traffic"
+    vpc_id      = var.vpc
+
+    ingress {
+        description      = "nfs"
+        from_port        = 2049
+        to_port          = 2049
+        protocol         = "TCP"
+        cidr_blocks      = [var.vpc_cidr_block]
+    }
+}
+
 locals {
     flattened_groups = {
         for k, v in var.cluster_node_groups: k => {
-            ami_type       = v.ami_type
-            capacity_type  = v.capacity_type
-            instance_types = v.instance_types
+            ami_type                     = v.ami_type
+            capacity_type                = v.capacity_type
+            instance_types               = v.instance_types
+            vpc_security_group_ids       = [aws_security_group.eks.id]
+            iam_role_additional_policies = {
+                AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+            }
 
             min_size     = v.group_min
             max_size     = v.group_max
@@ -90,6 +147,12 @@ module "eks" {
         vpc-cni = {
             most_recent = true
         }
+        aws-ebs-csi-driver = {
+            most_recent = true
+        }
+        aws-efs-csi-driver = {
+            most_recent = true
+        }
     }
 
     vpc_id                   = var.vpc
@@ -97,6 +160,19 @@ module "eks" {
     control_plane_subnet_ids = var.vpc_intra_subnets
 
     eks_managed_node_groups = local.flattened_groups
+}
+
+resource "aws_efs_file_system" "kube" {
+    creation_token = "eks-efs"
+    encrypted      = true
+}
+
+resource "aws_efs_mount_target" "mount" {
+    for_each = toset(var.vpc_private_subnets)
+
+    file_system_id  = aws_efs_file_system.kube.id
+    subnet_id       = each.key
+    security_groups = [aws_security_group.efs.id]
 }
 
 resource "aws_iam_role" "k8s_admin" {

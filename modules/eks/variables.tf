@@ -54,6 +54,12 @@ variable "vpc" {
     nullable    = false
 }
 
+variable "vpc_cidr_block" {
+    type        = string
+    description = "CIDR Block of the created VPC"
+    nullable    = false
+}
+
 variable "vpc_private_subnets" {
     type        = list(string)
     description = "AWS Private Subnet IDs"
