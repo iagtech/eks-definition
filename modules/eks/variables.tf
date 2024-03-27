@@ -1,9 +1,3 @@
-variable "region" {
-    type        = string
-    description = "AWS Region to create the cluster in"
-    nullable    = false
-}
-
 variable "cluster_name" {
     type        = string
     description = "Name of the cluster"
@@ -42,6 +36,18 @@ variable "cluster_enable_public_access" {
     nullable    = false
 }
 
+variable "cluster_admin_users" {
+    type        = list(string)
+    description = "ARNs of users to be granted admin access"
+    nullable    = false
+}
+
+variable "cluster_readonly_users" {
+    type        = list(string)
+    description = "ARNs of users to be granted read only access"
+    nullable    = false
+}
+
 variable "vpc" {
     type        = string
     description = "AWS VPC Object"
@@ -57,5 +63,11 @@ variable "vpc_private_subnets" {
 variable "vpc_public_subnets" {
     type        = list(string)
     description = "AWS Public Subnet IDs"
+    nullable    = false
+}
+
+variable "vpc_intra_subnets" {
+    type        = list(string)
+    description = "AWS Intra Subnet IDs"
     nullable    = false
 }

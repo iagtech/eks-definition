@@ -1,22 +1,43 @@
-resource "aws_iam_role" "role" {
-    for_each = toset(["administrator", "read-only"])
+data "aws_caller_identity" "current" {}
 
-    name = "${var.cluster_name}-${each.key}"
+data "aws_iam_session_context" "current" {
+    arn = data.aws_caller_identity.current.arn
+}
 
-    # Just using for this example
-    assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-            {
-                Action = "sts:AssumeRole"
-                Effect = "Allow"
-                Sid    = "Example"
-                Principal = {
-                    Service = "ec2.amazonaws.com"
-                }
-            },
+data "aws_iam_policy_document" "k8s_admin" {
+    statement {
+        actions = ["sts:AssumeRole"]
+        effect  = "Allow"
+        principals {
+            identifiers = concat(
+                [data.aws_iam_session_context.current.issuer_arn],
+                var.cluster_admin_users
+            )
+            type = "AWS"
+        }
+    }
+}
+
+data "aws_iam_policy_document" "k8s_readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    statement {
+        actions = ["sts:AssumeRole"]
+        effect  = "Allow"
+        principals {
+            identifiers = var.cluster_readonly_users
+            type = "AWS"
+        }
+    }
+}
+
+data "aws_iam_policy_document" "clusteraccess" {
+    statement {
+        actions = [
+            "eks:DescribeCluster",
         ]
-    })
+        resources = [module.eks.cluster_arn]
+    }
 }
 
 locals {
@@ -76,35 +97,80 @@ module "eks" {
     control_plane_subnet_ids = var.vpc_intra_subnets
 
     eks_managed_node_groups = local.flattened_groups
-    access_entries          = {
-        administrator = {
-            kubernetes_groups = []
-            principal_arn     = aws_iam_role.role["administrator"].arn
+}
 
-            policy_associations = {
-                single = {
-                    policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-                    access_scope = {
-                        type = "cluster"
-                    }
-                }
-            }
-        }
+resource "aws_iam_role" "k8s_admin" {
+    name               = replace("${var.cluster_name}-admin", "-", "_")
+    assume_role_policy = data.aws_iam_policy_document.k8s_admin.json
+}
 
-        read-only = {
-            kubernetes_groups = []
-            principal_arn     = aws_iam_role.role["read-only"].arn
+resource "aws_iam_policy" "k8s_admin" {
+    name   = "${var.cluster_name}-admin"
+    path   = "/"
+    policy = data.aws_iam_policy_document.clusteraccess.json
+}
 
-            policy_associations = {
-                single = {
-                    policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-                    access_scope = {
-                        type = "cluster"
-                    }
-                }
-            }
-        }
+resource "aws_iam_role_policy_attachment" "k8s_admin" {
+    role       = aws_iam_role.k8s_admin.name
+    policy_arn = aws_iam_policy.k8s_admin.arn
+}
+
+resource "aws_iam_role" "k8s_readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    name               = replace("${var.cluster_name}-readonly", "-", "_")
+    assume_role_policy = data.aws_iam_policy_document.k8s_readonly[0].json
+}
+
+resource "aws_iam_policy" "k8s_readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    name   = "${var.cluster_name}-readonly"
+    path   = "/"
+    policy = data.aws_iam_policy_document.clusteraccess.json
+}
+
+resource "aws_iam_role_policy_attachment" "k8s_readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    role       = aws_iam_role.k8s_readonly[0].name
+    policy_arn = aws_iam_policy.k8s_readonly[0].arn
+}
+
+resource "aws_eks_access_entry" "k8s_admin" {
+    cluster_name  = module.eks.cluster_name
+    principal_arn = aws_iam_role.k8s_admin.arn
+    type          = "STANDARD"
+    depends_on    = [aws_iam_role.k8s_admin]
+}
+
+resource "aws_eks_access_policy_association" "k8s_admin" {
+    cluster_name  = module.eks.cluster_name
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    principal_arn = aws_iam_role.k8s_admin.arn
+    access_scope {
+        type = "cluster"
     }
-    
-    enable_cluster_creator_admin_permissions = false
+    depends_on = [aws_eks_access_entry.k8s_admin]
+}
+
+resource "aws_eks_access_entry" "readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    cluster_name  = module.eks.cluster_name
+    principal_arn = aws_iam_role.k8s_readonly[0].arn
+    type          = "STANDARD"
+    depends_on    = [aws_iam_role.k8s_readonly]
+}
+
+resource "aws_eks_access_policy_association" "readonly" {
+    count = length(var.cluster_readonly_users) > 0 ? 1 : 0
+
+    cluster_name  = module.eks.cluster_name
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+    principal_arn = aws_iam_role.k8s_readonly[0].arn
+    access_scope {
+        type = "cluster"
+    }
+    depends_on = [aws_eks_access_entry.readonly]
 }

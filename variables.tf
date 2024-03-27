@@ -60,10 +60,22 @@ variable "cluster_node_groups" {
             instance_types               = ["r6g.xlarge"]
             volume_type                  = "gp2"
             volume_size                  = 20
-            group_desired_size           = 3
+            group_desired_size           = 1
             group_min                    = 1
             group_max                    = 5
             group_max_unavailable        = 1
         }
     }
+}
+
+variable "cluster_admin_users" {
+    type        = list(string)
+    description = "ARNs of users to be granted admin access"
+    default     = []
+}
+
+variable "cluster_readonly_users" {
+    type        = list(string)
+    description = "ARNs of users to be granted read only access"
+    default     = []
 }
