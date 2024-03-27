@@ -21,3 +21,17 @@ First init the provider with `tofu init`.  Once initialized, make any necessary 
 file.  Once ready, `tofu apply`.
 
 > Note: It is necessary to maintain one directory per cluster.
+
+## Contributing
+
+This repository does not accept contributions.
+
+## Authors
+
+* **Ethan McGee** - *Initial work* - [bulletshot60](https://github.com/ethantmcgee)
+
+See also the list of [contributors](https://github.com/iagtech/dep-check/contributors) who participated in this project.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/iagtech/dep-check/blob/main/LICENSE.md) file for details.
