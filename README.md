@@ -28,7 +28,7 @@ This repository does not accept contributions.
 
 ## Authors
 
-* **Ethan McGee** - *Initial work* - [bulletshot60](https://github.com/ethantmcgee)
+* **Ethan McGee** - *Initial work* - [ethantmcgee](https://github.com/ethantmcgee)
 
 See also the list of [contributors](https://github.com/iagtech/dep-check/contributors) who participated in this project.
 
